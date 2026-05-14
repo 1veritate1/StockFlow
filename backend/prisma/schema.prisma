@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider     = "prisma-client"
   output       = "../src/generated/prisma"
@@ -11,4 +6,225 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+enum ProjectRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum ProductStatus {
+  ACTIVE
+  DRAFT
+  ARCHIVED
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  RESTORE
+  LOGIN
+  LOGOUT
+}
+
+model User {
+  id String @id @default(uuid())
+
+  email    String  @unique
+  username String? @unique
+
+  passwordHash String
+
+  firstName String?
+  lastName  String?
+
+  avatarUrl String?
+
+  isActive        Boolean @default(true)
+  isEmailVerified Boolean @default(false)
+
+  lastLoginAt DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  memberships Membership[]
+  auditLogs   AuditLog[]
+
+  uploadedFiles Gallery[]
+
+  @@index([email])
+  @@index([username])
+  @@index([deletedAt])
+}
+
+model Project {
+  id String @id @default(uuid())
+
+  name String
+  slug String @unique
+
+  description String?
+
+  logoUrl String?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  memberships Membership[]
+
+  categories Category[]
+  products   Product[]
+  gallery    Gallery[]
+  auditLogs  AuditLog[]
+
+  @@index([slug])
+  @@index([deletedAt])
+}
+
+model Membership {
+  id String @id @default(uuid())
+
+  userId    String
+  projectId String
+
+  role ProjectRole @default(MEMBER)
+
+  joinedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, projectId])
+  @@index([userId])
+  @@index([projectId])
+}
+
+model Category {
+  id String @id @default(uuid())
+
+  name        String
+  description String?
+
+  projectId String
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  products Product[]
+
+  @@unique([projectId, name])
+  @@index([projectId])
+  @@index([deletedAt])
+}
+
+model Product {
+  id String @id @default(uuid())
+
+  name String
+  sku  String
+
+  description String?
+
+  price Decimal @db.Decimal(10, 2)
+
+  stock Int @default(0)
+
+  status ProductStatus @default(ACTIVE)
+
+  imageIds String[] @default([])
+
+  metadata Json?
+
+  projectId  String
+  categoryId String
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  category Category @relation(fields: [categoryId], references: [id])
+
+  @@unique([projectId, sku])
+  @@index([projectId])
+  @@index([categoryId])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model Gallery {
+  id String @id @default(uuid())
+
+  projectId String
+
+  filename     String
+  originalName String
+
+  mimeType String
+
+  size Int
+
+  path String
+  url  String
+
+  hash String
+
+  uploadedById String?
+
+  metadata Json?
+
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  uploadedBy User? @relation(fields: [uploadedById], references: [id])
+
+  @@unique([projectId, hash])
+  @@index([projectId])
+  @@index([uploadedById])
+  @@index([mimeType])
+  @@index([deletedAt])
+}
+
+model AuditLog {
+  id String @id @default(uuid())
+
+  action AuditAction
+
+  entityType String
+  entityId   String
+
+  metadata Json?
+
+  userId    String?
+  projectId String?
+
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  project Project? @relation(fields: [projectId], references: [id])
+
+  @@index([projectId])
+  @@index([userId])
+  @@index([entityType])
+  @@index([entityId])
+  @@index([createdAt])
 }
